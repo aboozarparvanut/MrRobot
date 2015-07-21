@@ -7,6 +7,7 @@ from requests.exceptions import *
 from selenium import webdriver
 
 import socks
+from modules.Parser import Parser
 from modules.tqdm import tqdm
 from sockshandler import SocksiPyHandler
 
@@ -20,7 +21,14 @@ class Visitor(object):
         self.__timeout = 1
         self.__readCount = 0
         self.__tor = urllib.request.build_opener(SocksiPyHandler(socks.PROXY_TYPE_SOCKS5, "127.0.0.1", 9150))
+        # default browser is chrome 41 on windows 8
+        self.__env = Parser(self.logger)
+        self.__headers = {'user-agent': str(self.env.getConfig("Chrome", env="Windows"))}
         #self.__driver = webdriver.Chrome()
+
+    @property
+    def env(self):
+        return self.__env
 
     @property
     def url(self):
@@ -48,6 +56,10 @@ class Visitor(object):
         return self.__tor
 
     @property
+    def header(self):
+        return self.__headers
+
+    @property
     def validVisits(self):
         return int(self.__readCount)
 
@@ -66,7 +78,7 @@ class Visitor(object):
                         self.torBrowser.open(self.url)
                         self.validVisits = self.validVisits + 1
                         if self.timeout > 5:
-                            self.timeout = self.timeout -1
+                            self.timeout = self.timeout - 1
                     except socks.GeneralProxyError:
                         self.logger.error("TOR Proxy is Down")
                         raise RuntimeError
@@ -81,7 +93,7 @@ class Visitor(object):
                         self.timeout = self.timeout + 1
                 else:
                     try:
-                        self.req.get(self.url, timeout=self.timeout)
+                        self.req.get(self.url, timeout=self.timeout, headers=self.header)
                         self.validVisits = self.validVisits + 1
                     except MissingSchema as err:
                         self.logger.error(err)

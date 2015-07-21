@@ -6,7 +6,7 @@ from modules.Visitor import Visitor
 
 def main():
 
-    logging.config.fileConfig('logging.ini')
+    logging.config.fileConfig('conf/logging.ini')
     logger = logging.getLogger()
     while True:
         try:
