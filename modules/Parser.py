@@ -4,13 +4,16 @@ import os
 
 class Parser(object):
 
-    def __init__(self, logger):
+    def __init__(self, logger, file=None):
+        if file is None:
+            iniFile = "../conf/browsers.ini"
+        else:
+            iniFile = file
         self.__config = configparser.ConfigParser()
-        APPLICATION_CONF = os.path.join(os.path.dirname(__file__),
-                                        "../conf/browsers.ini")
+        APPLICATION_CONF = os.path.join(os.path.dirname(__file__), iniFile)
         self.logger = logger
         self.__config.read(APPLICATION_CONF)
-        self.__environment = self.ConfigSectionMap("Default")['env']
+        self.__environment = self.ConfigSectionMap("Default")["env"]
 
     @property
     def environment(self):

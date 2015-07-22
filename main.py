@@ -10,16 +10,20 @@ def main():
     logger = logging.getLogger()
     while True:
         try:
-            use_tor = input('Do you want to use MultiIP capability[N]?: ')
+            use_tor = input("Do you want to use MultiIP capability[N]?: ")
             if use_tor.lower() in ['y', 'yes']:
                 use_tor = True
             else:
                 use_tor = False
             url = input("please enter URL:")
-            count = int(input("please enter number of visits:"))
+            countRaw = input("please enter number of visits:")
+            if countRaw.isnumeric():
+                count = int(countRaw)
+            else:
+                count = 1
             robot = Visitor(url=url, logger=logger)
             vistedTimes = robot.visitNoUI(count=count, timeout=1, selfHeal=True, use_tor=use_tor)
-            print("you've asked %d times and i've visited %d times" % (count, robot.validVisits))
+            print("you've asked %d times and ive visited %d times" % (count, robot.validVisits))
             result = input("do you want to visit another site[N]")
             if result.lower() != 'y':
                 print("bye bye...")
