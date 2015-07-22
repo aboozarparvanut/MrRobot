@@ -1,4 +1,6 @@
+import csv
 import logging
+import re
 import socket
 import urllib
 
@@ -7,6 +9,7 @@ from requests.exceptions import *
 from selenium import webdriver
 
 import socks
+from bs4 import BeautifulSoup
 from modules.Parser import Parser
 from modules.tqdm import tqdm
 from sockshandler import SocksiPyHandler
@@ -22,8 +25,8 @@ class Visitor(object):
         self.__readCount = 0
         self.__tor = urllib.request.build_opener(SocksiPyHandler(socks.PROXY_TYPE_SOCKS5, "127.0.0.1", 9150))
         # default browser is chrome 41 on windows 8
-        self.__env = Parser(self.logger)
-        self.__headers = {'user-agent': str(self.env.getConfig("Chrome", env="Windows"))}
+        self.__env = Parser(self.logger, "../conf/browsers.ini")
+        self.__headers = {'user-agent': self.env.getConfig("Chrome", env="Windows")}
         #self.__driver = webdriver.Chrome()
 
     @property
@@ -67,9 +70,11 @@ class Visitor(object):
     def validVisits(self, value):
         self.__readCount = value
 
-    def visitNoUI(self, count=1, timeout=None, selfHeal=None, use_tor=None):
+    def visitNoUI(self, count=None, timeout=None, selfHeal=None, use_tor=None, round=None):
         if timeout is not None:
             self.timeout = timeout
+        if count is None:
+            count = 1
         try:
             for i in tqdm(range(count)):
                 if use_tor:
@@ -93,23 +98,60 @@ class Visitor(object):
                         self.timeout = self.timeout + 1
                 else:
                     try:
-                        self.req.get(self.url, timeout=self.timeout, headers=self.header)
+                        #s = self.req.Session()
+                        r = self.req.get(str(self.url), timeout=self.timeout, headers=self.header)
                         self.validVisits = self.validVisits + 1
+                        if self.validVisits == 1:
+                            self.parseEmail(r.text)
                     except MissingSchema as err:
-                        self.logger.error(err)
+                        self.logger.exception(err)
                         raise RuntimeError("Invalid URL")
                     except ConnectionError as err:
                         self.logger.debug(err)
                     except ReadTimeout as err:
                         self.logger.debug(err)
                         self.timeout = self.timeout + 1
-                    except ConnectTimeoutError as err:
-                        self.logger.debug(err)
-                        self.timeout = self.timeout + 1
+                    # except ConnectTimeoutError as err:
+                    #    self.logger.debug(err)
+                    #    self.timeout = self.timeout + 1
             if selfHeal and self.validVisits != count:
-                self.visitNoUI(count=(count - self.validVisits), timeout=self.timeout, selfHeal=True, use_tor=use_tor)
+                if round is None:
+                    round = 1
+                if round == 3:
+                    self.visitNoUI(count=(count - self.validVisits), timeout=self.timeout,
+                                   selfHeal=False, use_tor=use_tor, round=round + 1)
+                else:
+                    self.visitNoUI(count=(count - self.validVisits), timeout=self.timeout,
+                                   selfHeal=True, use_tor=use_tor, round=round + 1)
             self.logger.info("visited %s \t {%d} times" % (str(self.url), int(self.validVisits)))
             return self.validVisits
         except Exception as err:
-            self.logger.error(err, exc_info=True)
+            self.logger.exception(err)
             return self.validVisits
+
+    def parseEmail(self, file):
+
+        # convert the infile to soup object
+        soup = BeautifulSoup(file, "html.parser")
+
+        # find all mailto (email) elements
+        mailtos = soup.select('a[href^=mailto]')
+
+        emails = []
+
+        # Extract emails
+        for i in mailtos:
+            if i.string != None:
+                emails.append(str(i.string.encode('utf-8').strip().decode(encoding="utf-8")))
+        # Store to File
+        try:
+            pars = Parser(self.logger, "../conf/application.ini")
+            outFile = pars.getConfig("emails", env="production")
+            with open(outFile, 'a', newline='') as csvfile:
+                spamwriter = csv.writer(csvfile, delimiter=' ',
+                                        quotechar='|', quoting=csv.QUOTE_MINIMAL)
+                spamwriter.writerow(emails)
+                return emails
+        except Exception as err:
+            self.logger.exception(err)
+            return None
