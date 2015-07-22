@@ -80,8 +80,11 @@ class Visitor(object):
                 if use_tor:
                     try:
                         socket.setdefaulttimeout(self.timeout)
-                        self.torBrowser.open(self.url)
+                        self.torBrowser.addheaders= [(v, k) for k, v in self.header.iteritems()]
+                        r = self.torBrowser.open(self.url)
                         self.validVisits = self.validVisits + 1
+                        if self.validVisits == 1:
+                            self.parseEmail(r.read())
                         if self.timeout > 5:
                             self.timeout = self.timeout - 1
                     except socks.GeneralProxyError:
@@ -103,6 +106,8 @@ class Visitor(object):
                         self.validVisits = self.validVisits + 1
                         if self.validVisits == 1:
                             self.parseEmail(r.text)
+                        if self.timeout > 5:
+                            self.timeout = self.timeout - 1
                     except MissingSchema as err:
                         self.logger.exception(err)
                         raise RuntimeError("Invalid URL")
