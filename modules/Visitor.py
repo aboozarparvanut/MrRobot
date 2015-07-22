@@ -80,7 +80,7 @@ class Visitor(object):
                 if use_tor:
                     try:
                         socket.setdefaulttimeout(self.timeout)
-                        self.torBrowser.addheaders= [(v, k) for k, v in self.header.iteritems()]
+                        self.torBrowser.addheaders = [(v, k) for k, v in self.header.iteritems()]
                         r = self.torBrowser.open(self.url)
                         self.validVisits = self.validVisits + 1
                         if self.validVisits == 1:
@@ -116,13 +116,14 @@ class Visitor(object):
                     except ReadTimeout as err:
                         self.logger.debug(err)
                         self.timeout = self.timeout + 1
-                    # except ConnectTimeoutError as err:
-                    #    self.logger.debug(err)
-                    #    self.timeout = self.timeout + 1
+                    except socket.timeout as err:
+                        # except ConnectTimeoutError as err:
+                        self.logger.debug(err)
+                        self.timeout = self.timeout + 1
             if selfHeal and self.validVisits != count:
                 if round is None:
                     round = 1
-                if round == 3:
+                if round == 5:
                     self.visitNoUI(count=(count - self.validVisits), timeout=self.timeout,
                                    selfHeal=False, use_tor=use_tor, round=round + 1)
                 else:
@@ -143,13 +144,18 @@ class Visitor(object):
         mailtos = soup.select('a[href^=mailto]')
 
         emails = []
-
-        # Extract emails
-        for i in mailtos:
-            if i.string != None:
-                emails.append(str(i.string.encode('utf-8').strip().decode(encoding="utf-8")))
-        # Store to File
+        emailsRaw = []
+        p = re.compile(r'mailto\:([^@]+@[^@]+\.[^@"]+)')
         try:
+            # Extract emails
+            for i in mailtos:
+                res = p.search(str(i))
+                if res is not None:
+                    emailsRaw.append(res.group(1))
+                elif i.string != None:
+                    emailsRaw.append(str(i.string.encode('utf-8').strip().decode(encoding="utf-8")))
+            # Store to File
+            emails = self.consolidate(emailsRaw)
             pars = Parser(self.logger, "../conf/application.ini")
             outFile = pars.getConfig("emails", env="production")
             with open(outFile, 'a', newline='') as csvfile:
@@ -160,3 +166,8 @@ class Visitor(object):
         except Exception as err:
             self.logger.exception(err)
             return None
+
+    def consolidate(self, seq):
+        seen = set()
+        seen_add = seen.add
+        return [x for x in seq if not (x in seen or seen_add(x))]
